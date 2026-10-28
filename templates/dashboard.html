@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - AgriTrack{% endblock %}
+{% block body %}
+<div class="card shadow-sm"><div class="card-body">
+  <h3 class="brand">Welcome, {{ user.name }}</h3>
+  <p class="mb-1"><strong>Role:</strong> {{ user.role }}</p>
+  <p class="mb-1"><strong>Location:</strong> {{ user.location }}</p>
+  <p class="mb-3"><strong>Phone:</strong> {{ user.phone }}</p>
+  <p class="text-muted small">You are logged in. Crop, inventory, finance and marketplace modules are added in later sprints.</p>
+  <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="btn btn-outline-secondary">Log out</button></form>
+</div></div>
+{% endblock %}

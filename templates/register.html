@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Register - AgriTrack{% endblock %}
+{% macro err(k) %}{% if errors.get(k) %}<div class="invalid-feedback d-block">{{ errors[k] }}</div>{% endif %}{% endmacro %}
+{% block body %}
+<h2 class="text-center brand mt-3">Create account</h2>
+<form method="post" class="card card-body shadow-sm" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="mb-3"><label class="form-label" for="name">Full name</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('name') }}" id="name" name="name" maxlength="40" value="{{ form.get('name','') }}" required>{{ err('name') }}</div>
+  <div class="mb-3"><label class="form-label" for="username">Username</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('username') }}" id="username" name="username" maxlength="20" autocomplete="username" value="{{ form.get('username','') }}" required>
+    <div class="form-text">4 to 20 letters, numbers or _</div>{{ err('username') }}</div>
+  <div class="mb-3"><label class="form-label" for="password">Password</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('password') }}" id="password" name="password" type="password" maxlength="30" autocomplete="new-password" required>
+    <div class="form-text">8 to 30 characters, at least one digit</div>{{ err('password') }}</div>
+  <div class="mb-3"><label class="form-label" for="role">Role</label>
+    <select class="form-select {{ 'is-invalid' if errors.get('role') }}" id="role" name="role" required>
+      <option value="">Select...</option>
+      {% for r in ['Farmer','Buyer','Supplier'] %}<option value="{{ r }}" {{ 'selected' if form.get('role')==r }}>{{ r }}</option>{% endfor %}
+    </select>{{ err('role') }}</div>
+  <div class="mb-3"><label class="form-label" for="phone">Phone</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('phone') }}" id="phone" name="phone" maxlength="15" value="{{ form.get('phone','') }}" required>
+    <div class="form-text">e.g. 0300-1234567</div>{{ err('phone') }}</div>
+  <div class="mb-3"><label class="form-label" for="location">Location</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('location') }}" id="location" name="location" maxlength="30" value="{{ form.get('location','') }}" required>{{ err('location') }}</div>
+  <button class="btn btn-farm btn-lg w-100" type="submit">Sign up</button>
+  <a class="btn btn-link w-100 mt-2" href="{{ url_for('login') }}">I already have an account</a>
+</form>
+{% endblock %}

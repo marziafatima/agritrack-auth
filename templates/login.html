@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Log in - AgriTrack{% endblock %}
+{% block body %}
+<h2 class="text-center brand mt-3">AgriTrack</h2>
+<p class="text-center text-muted">Farm &amp; Crop Management System</p>
+<form method="post" class="card card-body shadow-sm" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="mb-3"><label class="form-label" for="username">Username</label>
+    <input class="form-control" id="username" name="username" maxlength="20" autocomplete="username" required></div>
+  <div class="mb-3"><label class="form-label" for="password">Password</label>
+    <input class="form-control" id="password" name="password" type="password" maxlength="30" autocomplete="current-password" required></div>
+  <button class="btn btn-farm btn-lg w-100" type="submit">Log in</button>
+  <a class="btn btn-link w-100 mt-2" href="{{ url_for('register') }}">Register new account</a>
+</form>
+{% endblock %}
