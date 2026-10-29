@@ -1,10 +1,11 @@
 """AgriTrack - Sign In / Sign Up module (Flask + MySQL, hashed passwords)."""
-import os, re, secrets, ssl
+import os, re, secrets, socket, ssl
 from datetime import datetime
 from functools import wraps
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -25,7 +26,7 @@ def build_db():
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            options["connect_args"] = {"ssl": ctx}
+            options["connect_args"] = {"ssl": ctx, "connect_timeout": 10}
     return url.render_as_string(hide_password=False), options
 
 
@@ -68,8 +69,29 @@ def init_db():
             db.session.rollback()
 
 
-with app.app_context():
-    init_db()
+_db_ready = False
+
+
+def ensure_db():
+    """Try to prepare the database. If it is unreachable the site still starts and retries on the next request."""
+    global _db_ready
+    if _db_ready:
+        return True
+    try:
+        with app.app_context():
+            init_db()
+        _db_ready = True
+    except Exception as exc:
+        print("[AgriTrack] Database not ready:", type(exc).__name__, flush=True)
+    return _db_ready
+
+
+ensure_db()
+
+
+@app.before_request
+def _lazy_db():
+    ensure_db()
 
 
 # ---------------- CSRF protection ----------------
@@ -199,6 +221,41 @@ def admin_action(user, uid, action):
         db.session.commit()
         flash(f"{target.username} is now {new}", "success")
     return redirect(url_for("admin"))
+
+
+@app.route("/_diag")
+def diag():
+    """TEMPORARY connection check (shows no passwords or host names). Remove after deployment works."""
+    lines = []
+
+    def tcp(label, host, port):
+        try:
+            socket.create_connection((host, port), timeout=6).close()
+            lines.append(f"{label}: OK")
+        except Exception as exc:
+            lines.append(f"{label}: FAILED ({type(exc).__name__}: {exc})")
+
+    u = make_url(app.config["SQLALCHEMY_DATABASE_URI"])
+    lines.append(f"Database type: {u.get_backend_name()}")
+    if u.host:
+        port = u.port or 3306
+        try:
+            socket.getaddrinfo(u.host, port)
+            lines.append("DNS lookup of database host: OK")
+        except Exception as exc:
+            lines.append(f"DNS lookup of database host: FAILED ({type(exc).__name__})")
+        tcp(f"Network connection to database (port {port})", u.host, port)
+    tcp("Network connection to github.com port 443", "github.com", 443)
+    tcp("Network connection to github.com port 22", "github.com", 22)
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        lines.append("Database login: OK")
+    except Exception as exc:
+        code = getattr(getattr(exc, "orig", None), "args", [""])[0]
+        lines.append(f"Database login: FAILED ({type(exc).__name__}, code {code})")
+    lines.append(f"Tables ready: {_db_ready}")
+    return "\n".join(lines), 200, {"Content-Type": "text/plain"}
 
 
 @app.route("/logout", methods=["POST"])
