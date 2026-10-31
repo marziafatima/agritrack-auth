@@ -110,6 +110,7 @@ def _lazy_db():
 
 @app.route("/healthz")
 def healthz():
+    """Tell the host that the app is running."""
     return "ok"
 
 
@@ -171,11 +172,13 @@ def login_required(role=None):
 # ---------------- Routes ----------------
 @app.route("/")
 def home():
+    """Send the visitor to the dashboard or the login page."""
     return redirect(url_for("dashboard") if session.get("uid") else url_for("login"))
 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    """Create a new Pending account after checking the form."""
     errors, form = {}, {}
     if request.method == "POST":
         errors, form = validate_registration(request.form)
@@ -197,6 +200,7 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Check the username and password, then log the user in."""
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "")
@@ -219,12 +223,14 @@ def login():
 @app.route("/dashboard")
 @login_required()
 def dashboard(user):
+    """Show the welcome page for the logged-in user."""
     return render_template("dashboard.html", user=user)
 
 
 @app.route("/admin")
 @login_required("Admin")
 def admin(user):
+    """Show the Admin panel with the list of all users."""
     users = User.query.order_by(User.created_at.desc()).all()
     return render_template("admin.html", user=user, users=users)
 
@@ -232,6 +238,7 @@ def admin(user):
 @app.route("/admin/<int:uid>/<action>", methods=["POST"])
 @login_required("Admin")
 def admin_action(user, uid, action):
+    """Let the Admin verify, activate or block another user."""
     target = db.session.get(User, uid) or abort(404)
     new = {"verify": "Active", "activate": "Active", "block": "Blocked"}.get(action) or abort(404)
     if target.id == user.id:
@@ -281,6 +288,7 @@ def diag():
 
 @app.route("/logout", methods=["POST"])
 def logout():
+    """Log the user out and return to the login page."""
     session.clear()
     return redirect(url_for("login"))
 
