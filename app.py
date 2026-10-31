@@ -1,5 +1,10 @@
 """AgriTrack - Sign In / Sign Up module (Flask + MySQL, hashed passwords)."""
-import os, re, secrets, socket, ssl, time
+import os
+import re
+import secrets
+import socket
+import ssl
+import time
 from datetime import datetime
 from functools import wraps
 
