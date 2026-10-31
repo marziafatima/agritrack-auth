@@ -131,7 +131,8 @@ app.jinja_env.globals["csrf_token"] = csrf_token
 @app.before_request
 def check_csrf():
     if request.method == "POST":
-        if not secrets.compare_digest(request.form.get("_csrf", ""), session.get("_csrf", "")):
+        token = session.get("_csrf")
+        if not token or not secrets.compare_digest(request.form.get("_csrf", ""), token):
             abort(400)
 
 
