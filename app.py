@@ -1,5 +1,5 @@
 """AgriTrack - Sign In / Sign Up module (Flask + MySQL, hashed passwords)."""
-import os, re, secrets, socket, ssl
+import os, re, secrets, socket, ssl, time
 from datetime import datetime
 from functools import wraps
 
@@ -26,7 +26,7 @@ def build_db():
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            options["connect_args"] = {"ssl": ctx, "connect_timeout": 10}
+            options["connect_args"] = {"ssl": ctx, "connect_timeout": 8}
     return url.render_as_string(hide_password=False), options
 
 
@@ -70,13 +70,18 @@ def init_db():
 
 
 _db_ready = False
+_last_try = None
+NO_DB_ENDPOINTS = {"home", "healthz", "diag", "static"}
 
 
-def ensure_db():
-    """Try to prepare the database. If it is unreachable the site still starts and retries on the next request."""
-    global _db_ready
+def ensure_db(force=False):
+    """Prepare the database (tables + admin). Retries at most every 30 seconds so pages never hang."""
+    global _db_ready, _last_try
     if _db_ready:
         return True
+    if not force and _last_try is not None and time.monotonic() - _last_try < 30:
+        return False
+    _last_try = time.monotonic()
     try:
         with app.app_context():
             init_db()
@@ -86,12 +91,19 @@ def ensure_db():
     return _db_ready
 
 
-ensure_db()
-
-
 @app.before_request
 def _lazy_db():
-    ensure_db()
+    ep = request.endpoint
+    if ep in NO_DB_ENDPOINTS or (request.method == "GET" and ep in ("login", "register")):
+        return None
+    if not ensure_db():
+        return ("Service temporarily unavailable: the database cannot be reached right now. "
+                "Please try again in a minute.", 503)
+
+
+@app.route("/healthz")
+def healthz():
+    return "ok"
 
 
 # ---------------- CSRF protection ----------------
@@ -226,6 +238,7 @@ def admin_action(user, uid, action):
 @app.route("/_diag")
 def diag():
     """TEMPORARY connection check (shows no passwords or host names). Remove after deployment works."""
+    ensure_db(force=True)
     lines = []
 
     def tcp(label, host, port):
