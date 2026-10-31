@@ -1,4 +1,5 @@
 """AgriTrack - Sign In / Sign Up module (Flask + MySQL, hashed passwords)."""
+import logging
 import os
 import re
 import secrets
@@ -21,6 +22,9 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("DATABASE_URL"))
 app.config["PERMANENT_SESSION_LIFETIME"] = 1800
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("agritrack")  # security events are written here (never passwords)
 
 
 # ---------------- Database connection (SQLite locally, MySQL when DATABASE_URL is set) ----------------
@@ -231,12 +235,14 @@ def login():
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "")
         if is_locked_out(username):
+            log.warning("Login blocked (too many wrong attempts) for username %r", username)
             flash("Too many wrong attempts. Please try again in 5 minutes.", "danger")
             return render_template("login.html")
         user = User.query.filter_by(username=username).first()
         ok = check_password_hash(user.password_hash if user else DUMMY_HASH, password)
         if not user or not ok:
             register_failed_login(username)
+            log.warning("Failed login for username %r", username)
             flash("Wrong username or password", "danger")
         elif user.status == "Pending":
             flash("Your account is waiting for Admin verification", "warning")
@@ -244,6 +250,7 @@ def login():
             flash("Your account is blocked. Contact Admin", "danger")
         else:
             FAILED_LOGINS.pop(username, None)
+            log.info("Login OK for username %r", username)
             session.clear()
             session["uid"] = user.id
             session.permanent = True
@@ -277,6 +284,7 @@ def admin_action(user, uid, action):
     else:
         target.status = new
         db.session.commit()
+        log.info("Admin %r set %r to %s", user.username, target.username, new)
         flash(f"{target.username} is now {new}", "success")
     return redirect(url_for("admin"))
 
