@@ -198,21 +198,52 @@ def register():
     return render_template("register.html", errors=errors, form=form)
 
 
+FAILED_LOGINS = {}  # username -> (wrong attempts, time of first wrong attempt)
+MAX_ATTEMPTS = 5
+LOCK_SECONDS = 300
+
+
+def is_locked_out(username):
+    """Return True if this username had too many wrong passwords in the last 5 minutes."""
+    entry = FAILED_LOGINS.get(username)
+    if not entry:
+        return False
+    count, start = entry
+    if time.monotonic() - start >= LOCK_SECONDS:
+        FAILED_LOGINS.pop(username, None)
+        return False
+    return count >= MAX_ATTEMPTS
+
+
+def register_failed_login(username):
+    """Count one more wrong password for this username."""
+    entry = FAILED_LOGINS.get(username)
+    if not entry or time.monotonic() - entry[1] >= LOCK_SECONDS:
+        FAILED_LOGINS[username] = (1, time.monotonic())
+    else:
+        FAILED_LOGINS[username] = (entry[0] + 1, entry[1])
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """Check the username and password, then log the user in."""
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "")
+        if is_locked_out(username):
+            flash("Too many wrong attempts. Please try again in 5 minutes.", "danger")
+            return render_template("login.html")
         user = User.query.filter_by(username=username).first()
         ok = check_password_hash(user.password_hash if user else DUMMY_HASH, password)
         if not user or not ok:
+            register_failed_login(username)
             flash("Wrong username or password", "danger")
         elif user.status == "Pending":
             flash("Your account is waiting for Admin verification", "warning")
         elif user.status == "Blocked":
             flash("Your account is blocked. Contact Admin", "danger")
         else:
+            FAILED_LOGINS.pop(username, None)
             session.clear()
             session["uid"] = user.id
             session.permanent = True
@@ -294,4 +325,4 @@ def logout():
 
 
 if __name__ == "__main__":
-        app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
